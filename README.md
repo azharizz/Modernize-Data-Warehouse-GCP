@@ -8,7 +8,7 @@ OR
 Visit this Youtube Video :
 https://youtu.be/Urmqulp2EZk
 <a href="https://youtu.be/Urmqulp2EZk" target="_blank">
- <img src="https://img.youtube.com/vi/Urmqulp2EZk/maxresdefault.jpg" alt="Watch the video" width="240" height="180" border="10" />
+ <img src="https://img.youtube.com/vi/Urmqulp2EZk/maxresdefault.jpg" alt="Watch the video" border="10" />
 </a>
 
 ![image](https://github.com/azharizz/Modernize-Data-Warehouse-GCP/assets/45253059/93bb5a32-f5e8-4b31-ad69-385128a0d2b6)
