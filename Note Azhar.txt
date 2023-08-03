@@ -1,0 +1,283 @@
+1.
+As a business development manager, I want to be able to analyze the effectiveness of special offers and promotions in driving sales, so that I can make data-driven decisions on future marketing strategies.
+
+A business development manager, "I want to be able to analyze the effectiveness of special offers and promotions in driving sales, so that I can make data-driven decisions on future marketing strategies."
+
+2.
+As 
+A sales manager, "I want to be able to analyze sales data across different sales territories and USD to EUR currencies, so that I can identify high-performing territories and evaluate the impact of currency fluctuations on revenue and profitability."
+
+3. 
+As a customer relationship manager, I want to use real-time clustering to segment customers based on their purchase frequency and average order value, allowing me to develop targeted loyalty programs and retention strategies to drive repeat sales.
+
+Install Docker :
+
+
+sudo apt update
+
+sudo apt install apt-transport-https ca-certificates curl gnupg2 software-properties-common
+
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+
+sudo apt install docker-ce docker-ce-cli containerd.io
+
+sudo systemctl start docker
+
+sudo usermod -aG docker your_username
+sudo usermod -aG docker azharizzannada
+
+sudo apt update
+
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+sudo chmod +x /usr/local/bin/docker-compose
+
+docker-compose --version
+
+
+
+
+
+Install Airflow on Docker:
+
+https://airflow.apache.org/docs/docker-stack/entrypoint.html#entrypoint-commands
+
+
+
+
+Install dbt :
+
+cp key_file json ke /opt/airflow/plugins/key_file.json
+
+Masuk ke container worker
+
+pip install dbt-bigquery
+
+--force-reinstall
+
+
+dbt init
+
+
+cd
+
+ls -a
+
+cd .dbt/
+
+
+nano profiles.yml
+
+sales_testing_dbt:
+  outputs:
+    dev:
+      dataset: warehouse_sales
+      job_execution_timeout_seconds: 300
+      job_retries: 1
+      keyfile: /opt/airflow/plugins/key_file.json
+      location: asia-southeast1
+      method: service-account
+      priority: interactive
+      project: project-azhar-385817
+      threads: 1
+      type: bigquery
+  target: dev
+
+
+
+
+cd /opt/airflow/plugins/sales_testing_dbt/models/example && dbt run --model SalesPromotionStrategies
+
+cd /opt/airflow/plugins/sales_testing_dbt/models/example && dbt run --model EuroSalesByTerritory
+
+
+untuk macros masuk ke folder macros
+
+dbt docs generate
+
+dbt docs serve
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+No 3.
+Realtime
+
+Create Firestore Collection
+
+example name collection: customers
+
+
+Create PubSub Topics
+
+customer-clustering-topic
+
+
+Cloud Function from firestore to pubsub
+
+select firestore gen 1
+
+requirements.txt:
+
+firebase-admin==6.1.0
+google-cloud-pubsub==2.14.0
+
+
+main.py:
+
+import os
+from google.cloud import firestore
+from google.cloud import pubsub_v1
+
+
+# Initialize Firestore and Pub/Sub clients
+db = firestore.Client()
+publisher = pubsub_v1.PublisherClient()
+
+
+def hello_firestore(event, context):
+
+    print("GET FUNCTION RUN")
+
+    topic_name = 'projects/project-azhar-385817/topics/customer-clustering-topic'
+
+    # Get the Firestore document data
+    document_id = context.resource.split('/')[-1]
+    document_ref = db.collection('customers').document(document_id)
+    document_data = document_ref.get().to_dict()
+
+    print('DOCUMENT DATA : ', document_data)
+
+    # Publish the document data to Pub/Sub
+    message_data = str(document_data).encode('utf-8')
+
+    print('MESSAGE DATA : ', message_data)
+
+    future = publisher.publish(topic_name, message_data)
+    print('Message published to Pub/Sub successfully:', future.result())
+
+
+Create Dataflow jobs Pubsub > GCS
+
+nano PubSubToGCS
+
+JANGAN LUPA PAKAI ; delimiter
+
+cmd : 
+python PubSubToGCS.py \
+  --project=project-azhar-385817 \
+  --region=asia-southeast2 \
+  --input_topic=projects/project-azhar-385817/topics/customer-clustering-topic \
+  --output_path=gs://customer-clustering-bucket/dataflowoutput/output \
+  --runner=DataflowRunner \
+  --window_size=2 \
+  --num_shards=2 \
+  --temp_location=gs://customer-clustering-bucket/temp \
+  --service_account_email=service-account@project-azhar-385817.iam.gserviceaccount.com
+
+JOB_MESSAGE_DETAILED: Workers have started successfully.
+
+
+DataProc SPARK
+
+Create Model and job 
+
+nano creationmodel.py
+
+
+Create SparkStreamingJob
+
+nano spark_proc_final.py
+
+
+Both of the run in dataproc as pyspark
+
+
+Gcloud function from bucket to bigquery
+
+DONT FORGET keyfile.json
+
+
+from google.cloud import bigquery
+from google.cloud import storage
+import os
+
+def process_file(event, context):
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './keyfile.json'
+    # Extracting the bucket and file information from the event
+    bucket_name = event['bucket']
+    file_name = event['name']
+    file_path, file_name = os.path.split(file_name)  # Separating folder path and file name
+
+    storage_client = storage.Client()
+
+    # Checking if the file has a .csv extension
+    if file_name.lower().endswith('.csv'):
+        # Instantiating BigQuery and Storage clients
+        bq_client = bigquery.Client()
+        storage_client = storage.Client()
+        
+
+        # Setting up BigQuery table and dataset details
+        dataset_id = 'warehouse_sales'
+        table_id = 'customers_clustering'
+
+        # Constructing the BigQuery table reference
+        table_ref = bq_client.dataset(dataset_id).table(table_id)
+
+        try:
+            # Loading the data from Cloud Storage into BigQuery
+            job_config = bigquery.LoadJobConfig()
+            job_config.source_format = bigquery.SourceFormat.CSV
+            job_config.skip_leading_rows = 1  # If CSV file has a header
+            job_config.autodetect = True  # Detect schema automatically
+
+            # Constructing the Cloud Storage file URI
+            file_uri = f'gs://{bucket_name}/{file_path}/{file_name}'
+
+            # Loading the file into BigQuery
+            load_job = bq_client.load_table_from_uri(
+                file_uri, table_ref, job_config=job_config
+            )
+            load_job.result()  # Waits for the job to complete
+
+            # File loaded successfully, delete the file from Cloud Storage
+            blob = storage_client.get_bucket(bucket_name).blob(f'{file_path}/{file_name}')
+            blob.delete()
+
+            print(f"File {file_name} loaded into BigQuery table {table_id}")
+        except Exception as e:
+            print(f"Error loading file {file_name} into BigQuery: {str(e)}")
+    else:
+        # File does not have a .csv extension, delete the file from Cloud Storage
+        blob = storage_client.get_bucket(bucket_name).blob(f'{file_path}/{file_name}')
+        blob.delete()
+        print(f"File {file_name} deleted from Cloud Storage")
+
+
+
+
+
+requirements.txt : 
+google-cloud-bigquery==2.17.0
+google-cloud-storage==1.42.0
+pytz==2023.3
+
+
+
+
+
+
+
+
+
+

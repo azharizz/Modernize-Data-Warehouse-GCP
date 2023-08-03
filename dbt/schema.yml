@@ -1,0 +1,42 @@
+
+version: 2
+
+sources:
+  - name: warehouse_sales
+    tables:
+      - name: SalesOrderFact
+        identifier: SalesOrderFact
+      - name: SalesOrderStatus
+        identifier: SalesOrderStatus
+      - name: SalesOrderDetail
+        identifier: SalesOrderDetail
+      - name: CurrencyRate
+        identifier: CurrencyRate
+      - name: SalesTerritory
+        identifier: SalesTerritory
+      - name: CreditCard
+        identifier: CreditCard
+      - name: ContactCreditCard
+        identifier: ContactCreditCard
+      - name: Contact
+        identifier: Contact
+      - name: SpecialOffer
+        identifier: SpecialOffer
+
+models:
+
+  - name: SalesPromotionStrategies
+    description: "Requested by Business Development"
+    columns:
+      - name: SalesOrderID
+        description: "The primary key for this table"
+        tests:
+          - unique
+          - not_null
+
+  - name: EuroSalesByTerritory
+    description: "Requested by Sales Manager"
+
+
+
+
